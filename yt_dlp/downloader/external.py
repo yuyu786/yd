@@ -54,7 +54,7 @@ class ExternalFD(FragmentFD):
             # correct and expected termination thus all postprocessing
             # should take place
             retval = 0
-            self.to_screen('[%s] Interrupted by user' % self.get_basename())
+            self.to_screen(f'[{self.get_basename()}] Interrupted by user')
 
         if retval == 0:
             status = {
@@ -65,10 +65,10 @@ class ExternalFD(FragmentFD):
             if filename != '-':
                 fsize = os.path.getsize(encodeFilename(tmpfilename))
                 self.try_rename(tmpfilename, filename)
-                status.update({
+                status |= {
                     'downloaded_bytes': fsize,
                     'total_bytes': fsize,
-                })
+                }
             self._hook_progress(status, info_dict)
             return True
         else:
@@ -172,7 +172,7 @@ class ExternalFD(FragmentFD):
             if not self.params.get('keep_fragments', False):
                 self.try_remove(encodeFilename(fragment_filename))
         dest.close()
-        self.try_remove(encodeFilename('%s.frag.urls' % tmpfilename))
+        self.try_remove(encodeFilename(f'{tmpfilename}.frag.urls'))
         return 0
 
     def _call_process(self, cmd, info_dict):
@@ -235,8 +235,7 @@ class WgetFD(ExternalFD):
                 retry[1] = '0'
             cmd += retry
         cmd += self._option('--bind-address', 'source_address')
-        proxy = self.params.get('proxy')
-        if proxy:
+        if proxy := self.params.get('proxy'):
             for var in ('http_proxy', 'https_proxy'):
                 cmd += ['--execute', f'{var}={proxy}']
         cmd += self._valueless_option('--no-check-certificate', 'nocheckcertificate')
@@ -297,14 +296,7 @@ class Aria2cFD(ExternalFD):
                 f'--rpc-listen-port={info_dict["__rpc"]["port"]}',
                 f'--rpc-secret={info_dict["__rpc"]["secret"]}']
 
-        # aria2c strips out spaces from the beginning/end of filenames and paths.
-        # We work around this issue by adding a "./" to the beginning of the
-        # filename and relative path, and adding a "/" at the end of the path.
-        # See: https://github.com/yt-dlp/yt-dlp/issues/276
-        # https://github.com/ytdl-org/youtube-dl/issues/20312
-        # https://github.com/aria2/aria2/issues/1373
-        dn = os.path.dirname(tmpfilename)
-        if dn:
+        if dn := os.path.dirname(tmpfilename):
             cmd += ['--dir', self._aria2c_filename(dn) + os.path.sep]
         if 'fragments' not in info_dict:
             cmd += ['--out', self._aria2c_filename(os.path.basename(tmpfilename))]
@@ -312,7 +304,7 @@ class Aria2cFD(ExternalFD):
 
         if 'fragments' in info_dict:
             cmd += ['--file-allocation=none', '--uri-selector=inorder']
-            url_list_file = '%s.frag.urls' % tmpfilename
+            url_list_file = f'{tmpfilename}.frag.urls'
             url_list = []
             for frag_index, fragment in enumerate(info_dict['fragments']):
                 fragment_filename = '%s-Frag%d' % (os.path.basename(tmpfilename), frag_index)
@@ -475,15 +467,14 @@ class FFmpegFD(ExternalFD):
             args += ['-seekable', '1' if seekable else '0']
 
         env = None
-        proxy = self.params.get('proxy')
-        if proxy:
+        if proxy := self.params.get('proxy'):
             if not re.match(r'^[\da-zA-Z]+://', proxy):
-                proxy = 'http://%s' % proxy
+                proxy = f'http://{proxy}'
 
             if proxy.startswith('socks'):
                 self.report_warning(
-                    '%s does not support SOCKS proxies. Downloading is likely to fail. '
-                    'Consider adding --hls-prefer-native to your command.' % self.get_basename())
+                    f'{self.get_basename()} does not support SOCKS proxies. Downloading is likely to fail. Consider adding --hls-prefer-native to your command.'
+                )
 
             # Since December 2015 ffmpeg supports -http_proxy option (see
             # http://git.videolan.org/?p=ffmpeg.git;a=commit;h=b4eb1f29ebddd60c41a2eb39f5af701e38e0d3fd)

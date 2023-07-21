@@ -39,7 +39,7 @@ def set_environ(**kwargs):
     yield
 
     os.environ.clear()
-    os.environ.update(saved_environ)
+    os.environ |= saved_environ
 
 
 def _generate_expected_groups():
