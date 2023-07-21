@@ -116,8 +116,7 @@ class Changelog:
 
     def _format_groups(self, groups):
         for item in CommitGroup:
-            group = groups[item]
-            if group:
+            if group := groups[item]:
                 yield self.format_module(item.value, group)
 
     def format_module(self, name, group):
@@ -267,10 +266,7 @@ class CommitRange:
         result = subprocess.run(
             [cls.COMMAND, 'describe', '--contains', '--abbrev=0', commitish],
             stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True)
-        if result.returncode:
-            return 'HEAD'
-
-        return result.stdout.partition('~')[0].strip()
+        return 'HEAD' if result.returncode else result.stdout.partition('~')[0].strip()
 
     def __iter__(self):
         return iter(itertools.chain(self._commits.values(), self._commits_added))
@@ -305,8 +301,7 @@ class CommitRange:
 
             authors = [default_author] if default_author else []
             for line in iter(lambda: next(lines), self.COMMIT_SEPARATOR):
-                match = self.AUTHOR_INDICATOR_RE.match(line)
-                if match:
+                if match := self.AUTHOR_INDICATOR_RE.match(line):
                     authors = sorted(map(str.strip, line[match.end():].split(',')), key=str.casefold)
 
             commit = Commit(commit_hash, short, authors)
@@ -314,8 +309,7 @@ class CommitRange:
                 logger.debug(f'Skipped commit: {commit}')
                 continue
 
-            fix_match = self.FIXES_RE.search(commit.short)
-            if fix_match:
+            if fix_match := self.FIXES_RE.search(commit.short):
                 commitish = fix_match.group(1)
                 fixes[commitish].append(commit)
 
@@ -357,13 +351,12 @@ class CommitRange:
                 logger.info(f'CHANGE {self._commits[commit.hash]} -> {commit}')
                 self._commits[commit.hash] = commit
 
-        self._commits = {key: value for key, value in reversed(self._commits.items())}
+        self._commits = dict(reversed(self._commits.items()))
 
     def groups(self):
         groups = defaultdict(list)
         for commit in self:
-            upstream_re = self.UPSTREAM_MERGE_RE.match(commit.short)
-            if upstream_re:
+            if upstream_re := self.UPSTREAM_MERGE_RE.match(commit.short):
                 commit.short = f'[upstream] Merge up to youtube-dl {upstream_re.group(1)}'
 
             match = self.MESSAGE_RE.fullmatch(commit.short)
@@ -400,12 +393,12 @@ class CommitRange:
 
             if not group:
                 group = CommitGroup.get(prefix.lower())
-                if not group:
-                    if self.EXTRACTOR_INDICATOR_RE.search(commit.short):
-                        group = CommitGroup.EXTRACTOR
-                    else:
-                        group = CommitGroup.POSTPROCESSOR
-                    logger.warning(f'Failed to map {commit.short!r}, selected {group.name}')
+            if not group:
+                if self.EXTRACTOR_INDICATOR_RE.search(commit.short):
+                    group = CommitGroup.EXTRACTOR
+                else:
+                    group = CommitGroup.POSTPROCESSOR
+                logger.warning(f'Failed to map {commit.short!r}, selected {group.name}')
 
             commit_info = CommitInfo(
                 details, sub_details, message.strip(),
@@ -483,8 +476,9 @@ if __name__ == '__main__':
 
     logger.info(f'Loaded {len(commits)} commits')
 
-    new_contributors = get_new_contributors(args.contributors_path, commits)
-    if new_contributors:
+    if new_contributors := get_new_contributors(
+        args.contributors_path, commits
+    ):
         if args.contributors:
             with args.contributors_path.open('a') as file:
                 file.writelines(f'{contributor}\n' for contributor in new_contributors)
